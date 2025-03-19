@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - dev  # Runs on every push to dev branch
-  #pull_request:
-    #branches:
-      #- main  # Optional: Runs on PR to main
 
 jobs:
   build:
@@ -15,6 +12,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Recreate Google Service Account Key
+        run: echo "${{ secrets.GCP_SERVICE_ACCOUNT }}" | base64 --decode > backend/service_account.json
 
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
