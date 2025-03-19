@@ -1,16 +1,32 @@
-from fastapi import APIRouter, File, UploadFile
-import shutil
 import os
+import json
+import io
+from fastapi import APIRouter, File, UploadFile
+from google.cloud import vision
+from google.oauth2 import service_account
+
+# Load Google Vision API credentials
+SERVICE_ACCOUNT_FILE = "service_account.json"
+credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
+
+# Initialize Google Vision client
+client = vision.ImageAnnotatorClient(credentials=credentials)
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+@router.post("/analyze-food/")
+async def analyze_food(file: UploadFile = File(...)):
+    """Receives an image, sends it to Google Vision API, and returns detected food labels."""
 
-@router.post("/upload/")
-async def upload_image(file: UploadFile = File(...)):
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Read the uploaded image
+    image_data = await file.read()
+    image = vision.Image(content=image_data)
 
-    return {"filename": file.filename, "path": file_path}
+    # Request label detection
+    response = client.label_detection(image=image)
+    labels = response.label_annotations
+
+    # Extract relevant labels
+    food_items = [label.description for label in labels]
+
+    return {"recognized_food": food_items}
