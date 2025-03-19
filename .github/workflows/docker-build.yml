@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - dev  # Runs on every push to dev branch
+      - dev  # Runs on every push to dev branch-
 
 jobs:
   build:
