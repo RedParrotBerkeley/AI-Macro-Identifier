@@ -21,6 +21,12 @@ client = vision.ImageAnnotatorClient(credentials=credentials)
 # Define non-food objects to ignore
 NON_FOOD_LABELS = {"Table", "Bowl", "Plate", "Dish", "Utensil", "Furniture"}
 
+# Define a set of generic labels to filter out
+GENERIC_LABELS = {
+    "Food", "Produce", "Ingredient", "Natural foods", "Superfood", "Food group",
+    "Recipe", "Eating", "Evening snacks", "Nutrient", "Weight loss"
+}
+
 @router.post("/upload-image/")
 async def upload_file(file: UploadFile = File(...)):
     image_data = await file.read()
@@ -32,50 +38,34 @@ async def upload_file(file: UploadFile = File(...)):
         'features': [
             {'type_': vision.Feature.Type.LABEL_DETECTION},
             {'type_': vision.Feature.Type.WEB_DETECTION},
-            {'type_': vision.Feature.Type.LOGO_DETECTION},
-            {'type_': vision.Feature.Type.OBJECT_LOCALIZATION},
-            {'type_': vision.Feature.Type.TEXT_DETECTION}
+            {'type_': vision.Feature.Type.OBJECT_LOCALIZATION}
         ]
     })
 
     if response.error.message:
         raise HTTPException(status_code=500, detail=response.error.message)
 
-    detected_foods = []
+    detected_foods = set()  # Use a set to avoid duplicates
 
-    # Extract Labels and filter out non-food items
+    # Extract Labels - prioritize specific food names
     if response.label_annotations:
         for label in response.label_annotations:
-            if label.score > 0.6 and label.description not in NON_FOOD_LABELS:
-                detected_foods.append({
-                    "name": label.description,
-                    "score": round(label.score, 2)  # Round confidence score for better readability
-                })
+            if label.score > 0.75 and label.description not in GENERIC_LABELS:
+                detected_foods.add(label.description)
 
-    # Extract Web Results for additional food recognition
+    # Extract Web Detection (Often provides clearer food names)
     if response.web_detection.web_entities:
         for web_entity in response.web_detection.web_entities:
-            if web_entity.score > 0.6 and web_entity.description not in NON_FOOD_LABELS:
-                detected_foods.append({
-                    "name": web_entity.description,
-                    "score": round(web_entity.score, 2)
-                })
+            if web_entity.score > 0.75 and web_entity.description not in GENERIC_LABELS:
+                detected_foods.add(web_entity.description)
 
     # Extract Object Localization (for detecting individual food items)
     if response.localized_object_annotations:
         for obj in response.localized_object_annotations:
-            if obj.name not in NON_FOOD_LABELS:
-                detected_foods.append({
-                    "name": obj.name,
-                    "score": round(obj.score, 2)
-                })
+            if obj.name not in GENERIC_LABELS:
+                detected_foods.add(obj.name)
 
-    # Extract Text from Image (useful for packaged food items)
-    if response.text_annotations:
-        text_detected = response.text_annotations[0].description.strip()
-        detected_foods.append({
-            "name": "Text detected: " + text_detected,
-            "score": 1.0
-        })
+    # Convert set back to list and format output
+    detected_foods = [{"name": food, "score": 1.0} for food in detected_foods]  # Assuming high confidence
 
     return {"detected_foods": detected_foods or "No food items detected."}
