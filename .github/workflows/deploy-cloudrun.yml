@@ -34,3 +34,4 @@ jobs:
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated
+            --set-env-vars USDA_API_KEY=${{ secrets.USDA_API_KEY }}
