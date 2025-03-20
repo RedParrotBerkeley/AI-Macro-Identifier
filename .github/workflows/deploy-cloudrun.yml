@@ -33,5 +33,5 @@ jobs:
             --image us-central1-docker.pkg.dev/ai-macro-identifier/macro-api/macro-api:latest \
             --platform managed \
             --region us-central1 \
-            --allow-unauthenticated
+            --allow-unauthenticated \
             --set-env-vars USDA_API_KEY=${{ secrets.USDA_API_KEY }}
