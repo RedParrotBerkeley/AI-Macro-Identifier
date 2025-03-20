@@ -1,0 +1,19 @@
+{
+  "name": "ai-macro-tracker",
+  "version": "1.0.0",
+  "description": "Frontend for AI Macro Tracker",
+  "main": "src/index.js",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "axios": "^1.5.1",
+    "styled-components": "^6.0.3"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  }
+}
