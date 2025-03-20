@@ -18,28 +18,44 @@ credentials = service_account.Credentials.from_service_account_file(credentials_
 
 client = vision.ImageAnnotatorClient(credentials=credentials)
 
+# Define non-food objects to ignore
+NON_FOOD_LABELS = {"Table", "Bowl", "Plate", "Dish", "Utensil", "Furniture"}
 
 @router.post("/upload-image/")
 async def upload_file(file: UploadFile = File(...)):
-    # Read the uploaded image
     image_data = await file.read()
     image = vision.Image(content=image_data)
 
-    # Use OBJECT_LOCALIZATION instead of LABEL_DETECTION
-    response = client.object_localization(image=image)
+    # Request both LABEL_DETECTION and WEB_DETECTION
+    response = client.annotate_image({
+        'image': image,
+        'features': [
+            {'type_': vision.Feature.Type.LABEL_DETECTION},
+            {'type_': vision.Feature.Type.WEB_DETECTION}
+        ]
+    })
 
     if response.error.message:
         raise HTTPException(status_code=500, detail=response.error.message)
 
-    detected_objects = []
-    for obj in response.localized_object_annotations:
-        detected_objects.append({
-            "name": obj.name,  # More specific than labels
-            "score": obj.score,  # Confidence level
-            "bounding_box": [(v.x, v.y) for v in obj.bounding_poly.normalized_vertices]  # Bounding box coordinates
-        })
+    detected_foods = []
 
-    if not detected_objects:
-        return {"detail": "No objects detected."}
+    # Extract Labels and filter out non-food items
+    if response.label_annotations:
+        for label in response.label_annotations:
+            if label.score > 0.6 and label.description not in NON_FOOD_LABELS:
+                detected_foods.append({
+                    "name": label.description,
+                    "score": round(label.score, 2)  # Round confidence score for better readability
+                })
 
-    return {"detected_foods": detected_objects}
+    # Extract Web Results for additional food recognition
+    if response.web_detection.web_entities:
+        for web_entity in response.web_detection.web_entities:
+            if web_entity.score > 0.6 and web_entity.description not in NON_FOOD_LABELS:
+                detected_foods.append({
+                    "name": web_entity.description,
+                    "score": round(web_entity.score, 2)
+                })
+
+    return {"detected_foods": detected_foods or "No food items detected."}
