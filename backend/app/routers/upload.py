@@ -26,12 +26,15 @@ async def upload_file(file: UploadFile = File(...)):
     image_data = await file.read()
     image = vision.Image(content=image_data)
 
-    # Request both LABEL_DETECTION and WEB_DETECTION
+    # Request multiple detections for better food recognition
     response = client.annotate_image({
         'image': image,
         'features': [
             {'type_': vision.Feature.Type.LABEL_DETECTION},
-            {'type_': vision.Feature.Type.WEB_DETECTION}
+            {'type_': vision.Feature.Type.WEB_DETECTION},
+            {'type_': vision.Feature.Type.LOGO_DETECTION},
+            {'type_': vision.Feature.Type.OBJECT_LOCALIZATION},
+            {'type_': vision.Feature.Type.TEXT_DETECTION}
         ]
     })
 
@@ -57,5 +60,22 @@ async def upload_file(file: UploadFile = File(...)):
                     "name": web_entity.description,
                     "score": round(web_entity.score, 2)
                 })
+
+    # Extract Object Localization (for detecting individual food items)
+    if response.localized_object_annotations:
+        for obj in response.localized_object_annotations:
+            if obj.name not in NON_FOOD_LABELS:
+                detected_foods.append({
+                    "name": obj.name,
+                    "score": round(obj.score, 2)
+                })
+
+    # Extract Text from Image (useful for packaged food items)
+    if response.text_annotations:
+        text_detected = response.text_annotations[0].description.strip()
+        detected_foods.append({
+            "name": "Text detected: " + text_detected,
+            "score": 1.0
+        })
 
     return {"detected_foods": detected_foods or "No food items detected."}
