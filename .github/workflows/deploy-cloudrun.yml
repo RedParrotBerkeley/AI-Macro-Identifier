@@ -19,7 +19,7 @@ jobs:
       - name: Login to Google Cloud
         run: |
           gcloud auth activate-service-account cloud-run-deployer@ai-macro-identifier.iam.gserviceaccount.com --key-file=backend/service_account.json
-          gcloud config set project YOUR_PROJECT_ID
+          gcloud config set project ai-macro-identifier
           gcloud auth configure-docker us-central1-docker.pkg.dev
 
       - name: Build & Push Docker Image
