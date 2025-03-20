@@ -5,6 +5,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from google.cloud import vision
 from google.oauth2 import service_account
 from PIL import Image
+from google.cloud.vision_v1.types.image_annotator import AnnotateImageResponse
 
 router = APIRouter()
 
@@ -14,26 +15,31 @@ if not os.path.exists(credentials_path):
     raise FileNotFoundError("Google service account credentials not found.")
 
 credentials = service_account.Credentials.from_service_account_file(credentials_path)
+
 client = vision.ImageAnnotatorClient(credentials=credentials)
 
-@router.post("/upload-image/")
-async def upload_image(file: UploadFile = File(...)):
-    try:
-        # Read image bytes
-        image_bytes = await file.read()
-        image = vision.Image(content=image_bytes)
 
-        # Send to Google Vision API
-        response = client.label_detection(image=image)
-        labels = response.label_annotations
+@router.post("/upload/")
+async def upload_file(file: UploadFile = File(...)):
+    # Read the uploaded image
+    image_data = await file.read()
+    image = vision.Image(content=image_data)
 
-        # Extract food-related labels
-        detected_foods = [label.description for label in labels if "food" in label.description.lower()]
+    # Use OBJECT_LOCALIZATION instead of LABEL_DETECTION
+    response = client.object_localization(image=image)
 
-        if not detected_foods:
-            return {"message": "No food detected in image."}
+    if response.error.message:
+        raise HTTPException(status_code=500, detail=response.error.message)
 
-        return {"detected_foods": detected_foods}
+    detected_objects = []
+    for obj in response.localized_object_annotations:
+        detected_objects.append({
+            "name": obj.name,  # More specific than labels
+            "score": obj.score,  # Confidence level
+            "bounding_box": [(v.x, v.y) for v in obj.bounding_poly.normalized_vertices]  # Bounding box coordinates
+        })
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    if not detected_objects:
+        return {"detail": "No objects detected."}
+
+    return {"detected_foods": detected_objects}
