@@ -2,8 +2,18 @@ import os
 import uvicorn
 from fastapi import FastAPI
 from app.routers import usda  
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# Allow frontend to call the backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # You can restrict this later to just your frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include USDA router
 app.include_router(usda.router)
