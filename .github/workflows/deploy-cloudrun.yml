@@ -30,7 +30,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy macro-api \
-            --image us-central1-docker.pkg.dev/ai-macro-identifier/macro-api:latest \
+            --image us-central1-docker.pkg.dev/ai-macro-identifier/macro-api/macro-api:latest \
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated
