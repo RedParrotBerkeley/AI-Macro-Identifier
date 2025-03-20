@@ -19,7 +19,7 @@ credentials = service_account.Credentials.from_service_account_file(credentials_
 client = vision.ImageAnnotatorClient(credentials=credentials)
 
 
-@router.post("/upload/")
+@router.post("/upload-images/")
 async def upload_file(file: UploadFile = File(...)):
     # Read the uploaded image
     image_data = await file.read()
