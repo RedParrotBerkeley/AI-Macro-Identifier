@@ -13,24 +13,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Authenticate with Google Cloud
-        run: echo "${{ secrets.GCP_CLOUD_RUN_KEY }}" | base64 --decode > gcloud-key.json
+      - name: Recreate Google Service Account Key
+        run: echo "${{ secrets.GCP_SERVICE_ACCOUNT }}" | base64 --decode > backend/service_account.json
 
       - name: Login to Google Cloud
         run: |
-          gcloud auth activate-service-account --key-file=gcloud-key.json
+          gcloud auth activate-service-account --key-file=backend/service_account.json
           gcloud config set project your-google-cloud-project-id
           gcloud auth configure-docker us-central1-docker.pkg.dev
 
-      - name: Build & Push Docker Image to Google Artifact Registry
+      - name: Build & Push Docker Image
         run: |
-          docker build -t us-central1-docker.pkg.dev/your-google-cloud-project-id/macro-api:latest ./backend
-          docker push us-central1-docker.pkg.dev/your-google-cloud-project-id/macro-api:latest
+          docker build -t us-central1-docker.pkg.dev/ai-macro-identifier/macro-api:latest ./backend
+          docker push us-central1-docker.pkg.dev/ai-macro-identifier/macro-api:latest
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy macro-api \
-            --image us-central1-docker.pkg.dev/112902966057763253351/macro-api:latest \
+            --image us-central1-docker.pkg.dev/ai-macro-identifier/macro-api:latest \
             --platform managed \
             --region us-central1 \
             --allow-unauthenticated
