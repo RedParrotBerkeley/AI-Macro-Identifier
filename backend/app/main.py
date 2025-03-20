@@ -3,6 +3,7 @@ import uvicorn
 from fastapi import FastAPI
 from app.routers import usda  
 from fastapi.middleware.cors import CORSMiddleware
+from app.routers import upload
 
 app = FastAPI()
 
@@ -15,8 +16,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include USDA router
+# Include USDA and upload router
 app.include_router(usda.router)
+app.include_router(upload.router)
 
 @app.get("/")
 def read_root():
