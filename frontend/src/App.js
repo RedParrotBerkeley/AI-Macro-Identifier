@@ -1,52 +1,51 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import styled from 'styled-components';
+import React, { useState } from "react";
+import axios from "axios";
+import styled from "styled-components";
 
 const Container = styled.div`
   text-align: center;
-  max-width: 600px;
-  margin: auto;
+  margin-top: 50px;
 `;
 
 const Input = styled.input`
-  width: 80%;
+  width: 300px;
   padding: 10px;
-  margin: 10px 0;
-  border-radius: 5px;
-  border: 1px solid #ccc;
+  margin-right: 10px;
 `;
 
 const Button = styled.button`
-  background: #007bff;
+  padding: 10px 20px;
+  background-color: blue;
   color: white;
   border: none;
-  padding: 10px 20px;
-  margin: 10px;
   cursor: pointer;
-  border-radius: 5px;
 `;
 
-const ResultBox = styled.div`
-  border: 1px solid #ddd;
-  padding: 10px;
-  margin: 10px;
-  border-radius: 5px;
+const Result = styled.pre`
+  margin-top: 20px;
   text-align: left;
+  white-space: pre-wrap;
 `;
 
-export default function App() {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
+function App() {
+  const [query, setQuery] = useState("");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const fetchData = async () => {
+    if (!query) return;
+
+    setLoading(true);
     try {
       const response = await axios.get(
         `https://macro-api-746891065225.us-central1.run.app/usda?query=${query}`
       );
-      setResults(response.data.foods || []);
+      setData(response.data);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error("Error fetching data:", error);
+      setData({ error: "Failed to fetch data" });
     }
+    setLoading(false);
   };
 
   return (
@@ -58,19 +57,12 @@ export default function App() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-      <Button onClick={fetchData}>Search</Button>
-
-      {results.length > 0 &&
-        results.map((food, index) => (
-          <ResultBox key={index}>
-            <h3>{food.description}</h3>
-            <p>Calories: {food.foodNutrients.find(n => n.nutrientName === "Energy")?.value || 'N/A'} kcal</p>
-            <p>Protein: {food.foodNutrients.find(n => n.nutrientName === "Protein")?.value || 'N/A'} g</p>
-            <p>Fat: {food.foodNutrients.find(n => n.nutrientName === "Total lipid (fat)")?.value || 'N/A'} g</p>
-            <p>Carbs: {food.foodNutrients.find(n => n.nutrientName === "Carbohydrate, by difference")?.value || 'N/A'} g</p>
-          </ResultBox>
-        ))}
+      <Button onClick={fetchData} disabled={loading}>
+        {loading ? "Loading..." : "Search"}
+      </Button>
+      {data && <Result>{JSON.stringify(data, null, 2)}</Result>}
     </Container>
   );
 }
 
+export default App;
