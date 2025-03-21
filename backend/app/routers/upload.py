@@ -18,11 +18,9 @@ credentials = service_account.Credentials.from_service_account_file(credentials_
 
 client = vision.ImageAnnotatorClient(credentials=credentials)
 
-# Define non-food objects to ignore
-NON_FOOD_LABELS = {"Table", "Bowl", "Plate", "Dish", "Utensil", "Furniture"}
-
-# Define a set of generic labels to filter out
-GENERIC_LABELS = {
+# Define a set of generic and non-food labels to filter out
+NON_FOOD_LABELS = {
+    "Bowl", "Plate", "Dish", "Tableware", "Cup", "Table", "Utensil", "Furniture",
     "Food", "Produce", "Ingredient", "Natural foods", "Superfood", "Food group",
     "Recipe", "Eating", "Evening snacks", "Nutrient", "Weight loss"
 }
@@ -32,7 +30,7 @@ async def upload_file(file: UploadFile = File(...)):
     image_data = await file.read()
     image = vision.Image(content=image_data)
 
-    # Request multiple detections for better food recognition
+    # Request multiple detection methods
     response = client.annotate_image({
         'image': image,
         'features': [
@@ -47,25 +45,25 @@ async def upload_file(file: UploadFile = File(...)):
 
     detected_foods = set()  # Use a set to avoid duplicates
 
-    # Extract Labels - prioritize specific food names
+    # Extract Labels (only food-related and above 0.8 confidence)
     if response.label_annotations:
         for label in response.label_annotations:
-            if label.score > 0.75 and label.description not in GENERIC_LABELS:
+            if label.score > 0.8 and label.description not in NON_FOOD_LABELS:
                 detected_foods.add(label.description)
 
-    # Extract Web Detection (Often provides clearer food names)
+    # Extract Web Detection (this usually gives **real food names**)
     if response.web_detection.web_entities:
         for web_entity in response.web_detection.web_entities:
-            if web_entity.score > 0.75 and web_entity.description not in GENERIC_LABELS:
+            if web_entity.score > 0.8 and web_entity.description not in NON_FOOD_LABELS:
                 detected_foods.add(web_entity.description)
 
-    # Extract Object Localization (for detecting individual food items)
+    # Extract Object Localization (this is good for multiple food items)
     if response.localized_object_annotations:
         for obj in response.localized_object_annotations:
-            if obj.name not in GENERIC_LABELS:
+            if obj.name not in NON_FOOD_LABELS:
                 detected_foods.add(obj.name)
 
-    # Convert set back to list and format output
-    detected_foods = [{"name": food, "score": 1.0} for food in detected_foods]  # Assuming high confidence
+    # Convert set to list and format results
+    detected_foods = [{"name": food, "score": 1.0} for food in detected_foods]
 
     return {"detected_foods": detected_foods or "No food items detected."}
