@@ -5,7 +5,14 @@ export type AnalyzeImageInput = {
   imageUrl?: string;
 };
 
+export type AnalysisPipelineStage = "mocked-analysis" | "provider-analysis";
+
+export type AnalysisProviderResult = {
+  analysis: AnalysisResult;
+  pipelineStage: AnalysisPipelineStage;
+};
+
 export interface AnalysisProvider {
   name: string;
-  analyze(input: AnalyzeImageInput): Promise<AnalysisResult>;
+  analyze(input: AnalyzeImageInput): Promise<AnalysisProviderResult>;
 }

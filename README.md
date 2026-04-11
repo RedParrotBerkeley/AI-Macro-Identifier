@@ -43,6 +43,7 @@ Detailed notes live in:
 - `docs/research-notes-2026-04-11.md`
 - `docs/architecture/overview.md`
 - `docs/development/roadmap.md`
+- `docs/development/usda-grounding.md`
 
 ## Production vs development structure
 
@@ -72,8 +73,11 @@ Detailed notes live in:
 ### Backend
 - `app/api/analyze/route.ts` as backend-for-frontend entry point
 - analysis provider abstraction via `src/lib/analysis`
+- schema validation and normalization for provider output
 - current mocked provider behind a stable structured schema
-- USDA search and nutrient extraction helpers
+- placeholder provider adapter for future live multimodal integration
+- USDA search, food-details fetch, and nutrient extraction helpers
+- USDA grounding module for mapping detected foods to public nutrient records
 
 ## API contract, current mocked shape
 
@@ -128,9 +132,9 @@ A usable MVP should do all of the following:
 
 ## Next implementation priorities
 
-1. Replace the mocked analysis provider with a real multimodal provider adapter.
-2. Add validation and normalization for provider output.
-3. Expand USDA resolution from search into ranked food matching plus macro extraction.
+1. Replace the mocked analysis provider selected in `src/lib/analysis/factory.ts` with a real multimodal provider adapter.
+2. Map provider output into the validated analysis schema.
+3. Invoke USDA grounding from the analysis pipeline with clear success/failure handling.
 4. Add caching for repeated USDA lookups and resolved food records.
 5. Add persistence for meal history and corrected meals.
 

@@ -1,12 +1,20 @@
+import { normalizeAnalysisResult } from "@/lib/analysis/normalize";
+import type {
+  AnalysisProvider,
+  AnalyzeImageInput,
+  AnalysisProviderResult,
+} from "@/lib/analysis/provider";
 import { demoAnalysis } from "@/lib/demo-data";
-
-import type { AnalysisProvider, AnalyzeImageInput } from "@/lib/analysis/provider";
 
 export class MockAnalysisProvider implements AnalysisProvider {
   name = "mock-analysis-provider";
 
-  async analyze(_input: AnalyzeImageInput) {
+  async analyze(_input: AnalyzeImageInput): Promise<AnalysisProviderResult> {
     void _input;
-    return demoAnalysis;
+
+    return {
+      analysis: normalizeAnalysisResult(demoAnalysis),
+      pipelineStage: "mocked-analysis",
+    };
   }
 }

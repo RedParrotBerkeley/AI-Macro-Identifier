@@ -1,7 +1,5 @@
-import { MockAnalysisProvider } from "@/lib/analysis/mock-provider";
+import { getAnalysisProvider } from "@/lib/analysis/factory";
 import type { AnalysisResult } from "@/lib/types";
-
-const provider = new MockAnalysisProvider();
 
 export async function POST(request: Request) {
   const contentType = request.headers.get("content-type") || "";
@@ -18,17 +16,18 @@ export async function POST(request: Request) {
     imageProvided = formData.has("image");
   }
 
-  const analysis = await provider.analyze(input);
+  const provider = getAnalysisProvider();
+  const result = await provider.analyze(input);
 
   const response: AnalysisResult & {
     status: "ok";
-    pipelineStage: "mocked-analysis";
+    pipelineStage: string;
     imageProvided: boolean;
     provider: string;
   } = {
-    ...analysis,
+    ...result.analysis,
     status: "ok",
-    pipelineStage: "mocked-analysis",
+    pipelineStage: result.pipelineStage,
     imageProvided,
     provider: provider.name,
   };
