@@ -38,10 +38,16 @@ Known limitations:
 - synonym handling is still small and hand-authored
 - grounding still depends on the quality of upstream food detection
 
+Current improvements added:
+- more synonym normalization for common dish phrasing
+- mixed-dish caution notes and follow-up questions
+- explicit grounding-failure reasons for UI visibility
+- extra ranking penalty for weak branded mixed-dish matches
+
 ## Next steps
 
 - make USDA grounding optional but callable from the analysis pipeline
-- add better ranking heuristics and maybe synonym normalization
+- expand synonyms and add alias management from correction history
 - cache food-details lookups by `fdcId`
 - cache resolved food names to reduce repeated search calls
 - surface when grounding failed versus when it succeeded

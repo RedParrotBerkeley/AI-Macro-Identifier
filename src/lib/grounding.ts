@@ -13,7 +13,12 @@ const FOOD_SYNONYMS: Array<[RegExp, string]> = [
   [/\bcooked white rice\b/g, "white rice"],
   [/\bmixed vegetables\b/g, "vegetables"],
   [/\bplain steamed vegetables\b/g, "vegetables"],
+  [/\bcaesar salad\b/g, "salad"],
+  [/\bburrito bowl\b/g, "rice bowl"],
+  [/\bpasta with sauce\b/g, "pasta"],
 ];
+
+const MIXED_DISH_HINTS = ["salad", "bowl", "sandwich", "burger", "pizza", "pasta", "stir fry", "taco"];
 
 export type GroundingResult = {
   analysis: AnalysisResult;
@@ -21,6 +26,7 @@ export type GroundingResult = {
     originalName: string;
     matchedFood?: UsdaSearchFood;
     grounded: boolean;
+    reason?: string;
   }>;
 };
 
@@ -30,19 +36,28 @@ export async function groundAnalysisWithUsda(analysis: AnalysisResult): Promise<
       try {
         const normalizedFood = normalizeFoodName(food.name);
         const searchResults = await searchUsdaFoods(normalizedFood);
-        const matchedFood = rankUsdaCandidates({ ...food, name: normalizedFood }, searchResults)[0];
+        const rankedCandidates = rankUsdaCandidates({ ...food, name: normalizedFood }, searchResults);
+        const matchedFood = rankedCandidates[0];
 
         if (!matchedFood) {
           return {
-            food,
+            food: {
+              ...food,
+              ambiguityNotes: dedupe([
+                ...food.ambiguityNotes,
+                "USDA grounding did not find a confident database match.",
+              ]),
+            },
             grounded: false,
             originalName: food.name,
+            reason: "No USDA candidate found",
           };
         }
 
         const details = await getUsdaFoodDetails(matchedFood.fdcId);
         const macrosPer100g = extractMacrosFromUsdaNutrients(details.foodNutrients || []);
         const scaledMacros = scaleMacrosByWeight(macrosPer100g, food.estimatedWeightGrams);
+        const mixedDish = isMixedDish(food.name);
 
         return {
           food: {
@@ -53,21 +68,38 @@ export async function groundAnalysisWithUsda(analysis: AnalysisResult): Promise<
             ambiguityNotes: dedupe([
               ...food.ambiguityNotes,
               `Grounded against USDA ${matchedFood.dataType || "food"} record ${matchedFood.fdcId}.`,
+              mixedDish
+                ? "This looks like a mixed dish, so the USDA match is helpful but still approximate."
+                : "",
+            ]),
+            followUpQuestions: dedupe([
+              ...food.followUpQuestions,
+              mixedDish ? "Was this a custom mixed dish with added sauces or oils?" : "",
             ]),
           },
           matchedFood,
           grounded: true,
           originalName: food.name,
+          reason: mixedDish ? "Mixed dish grounded with caution" : "Matched USDA candidate",
         };
       } catch {
         return {
-          food,
+          food: {
+            ...food,
+            ambiguityNotes: dedupe([
+              ...food.ambiguityNotes,
+              "USDA grounding failed during lookup, so this item remains estimated.",
+            ]),
+          },
           grounded: false,
           originalName: food.name,
+          reason: "USDA lookup failed",
         };
       }
     })
   );
+
+  const groundedCount = groundedFoods.filter((entry) => entry.grounded).length;
 
   return {
     analysis: {
@@ -75,13 +107,16 @@ export async function groundAnalysisWithUsda(analysis: AnalysisResult): Promise<
       foods: groundedFoods.map((entry) => entry.food),
       notes: dedupe([
         ...analysis.notes,
-        "When USDA matches are available, macro estimates can be grounded to public nutrient records rather than model guesses.",
+        groundedCount
+          ? "When USDA matches are available, macro estimates can be grounded to public nutrient records rather than model guesses."
+          : "This result is still estimate-heavy because USDA grounding did not find strong matches.",
       ]),
     },
-    groundedFoods: groundedFoods.map(({ originalName, matchedFood, grounded }) => ({
+    groundedFoods: groundedFoods.map(({ originalName, matchedFood, grounded, reason }) => ({
       originalName,
       matchedFood,
       grounded,
+      reason,
     })),
   };
 }
@@ -98,8 +133,9 @@ function scoreCandidate(food: FoodCandidate, candidate: UsdaSearchFood) {
   const scoreBonus = candidate.score ?? 0;
   const dataTypeBonus = DATA_TYPE_PRIORITY[candidate.dataType || ""] ?? 0;
   const brandedPenalty = candidate.dataType === "Branded" && isGenericFood(foodName) ? 8 : 0;
+  const mixedDishPenalty = isMixedDish(foodName) && candidate.dataType === "Branded" ? 4 : 0;
 
-  return exactNameBonus + partialBonus + scoreBonus + dataTypeBonus - brandedPenalty;
+  return exactNameBonus + partialBonus + scoreBonus + dataTypeBonus - brandedPenalty - mixedDishPenalty;
 }
 
 function sharedWordCount(left: string, right: string) {
@@ -139,6 +175,10 @@ function isGenericFood(name: string) {
   return ["chicken", "chicken breast", "rice", "white rice", "vegetables", "avocado"].includes(name);
 }
 
+function isMixedDish(name: string) {
+  return MIXED_DISH_HINTS.some((hint) => name.includes(hint));
+}
+
 function dedupe(values: string[]) {
-  return Array.from(new Set(values));
+  return Array.from(new Set(values.filter(Boolean)));
 }

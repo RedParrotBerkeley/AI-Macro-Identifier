@@ -4,11 +4,11 @@ This list is ordered for MVP progress, not novelty.
 
 ## 1-5: make the pipeline real
 
-1. Wire `src/lib/analysis/factory.ts` to support a real provider selection path via environment flag.
-2. Implement the first live multimodal provider adapter behind the existing analysis contract.
-3. Convert provider output into the validated schema in `src/lib/analysis/normalize.ts`.
-4. Add explicit provider error handling in `/api/analyze` so failures return structured API errors.
-5. Invoke `groundAnalysisWithUsda()` inside the analysis route after provider analysis succeeds.
+1. Wire `src/lib/analysis/factory.ts` to support a real provider selection path via environment flag. ✅
+2. Implement the first live multimodal provider adapter behind the existing analysis contract. ✅
+3. Convert provider output into the validated schema in `src/lib/analysis/normalize.ts`. ✅
+4. Add explicit provider error handling in `/api/analyze` so failures return structured API errors. ✅
+5. Invoke `groundAnalysisWithUsda()` inside the analysis route after provider analysis succeeds. ✅
 
 ## 6-10: improve grounding quality
 

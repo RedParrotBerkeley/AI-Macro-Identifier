@@ -2,8 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { loadSavedMeals, saveMeal, type SavedMeal } from "@/lib/storage";
-import type { AnalysisResult, GroundingStatus } from "@/lib/types";
+import {
+  deleteMeal,
+  loadCorrections,
+  loadSavedMeals,
+  saveCorrection,
+  saveMeal,
+  type CorrectionEvent,
+  type SavedMeal,
+} from "@/lib/storage";
+import type { AnalysisResult, FoodCandidate, GroundingStatus } from "@/lib/types";
 
 type AnalyzeApiResponse = AnalysisResult & {
   status: "ok";
@@ -31,6 +39,26 @@ const manualReplacementOptions = [
   "Eggs, whole, cooked",
 ];
 
+const blankFood: FoodCandidate = {
+  name: "Custom food",
+  confidence: 0.5,
+  confidenceLabel: "low",
+  portionDescription: "manual entry",
+  estimatedWeightGrams: 100,
+  estimatedWeightRangeGrams: { min: 80, max: 120 },
+  portionConfidence: 0.5,
+  portionConfidenceLabel: "low",
+  ambiguityNotes: ["Added manually by the user."],
+  followUpQuestions: [],
+  macros: {
+    calories: 100,
+    proteinGrams: 5,
+    carbsGrams: 10,
+    fatGrams: 3,
+  },
+  dataSource: "estimated",
+};
+
 export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: AnalysisResult }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
@@ -43,10 +71,12 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
   const [pipelineStage, setPipelineStage] = useState<string>("mocked-analysis");
   const [grounding, setGrounding] = useState<GroundingStatus[]>([]);
   const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
+  const [corrections, setCorrections] = useState<CorrectionEvent[]>([]);
   const [saveMessage, setSaveMessage] = useState<string>("");
 
   useEffect(() => {
     setSavedMeals(loadSavedMeals());
+    setCorrections(loadCorrections());
   }, []);
 
   const totals = useMemo(() => {
@@ -63,6 +93,17 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
       { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 }
     );
   }, [analysis, portionMultipliers]);
+
+  function recordCorrection(event: Omit<CorrectionEvent, "id" | "createdAt">) {
+    const fullEvent: CorrectionEvent = {
+      ...event,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: new Date().toISOString(),
+    };
+
+    saveCorrection(fullEvent);
+    setCorrections(loadCorrections());
+  }
 
   function applyFile(file: File | null) {
     if (!file || !file.type.startsWith("image/")) return;
@@ -83,10 +124,6 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
 
     setIsAnalyzing(true);
     setError("");
-
-    if (previewUrl) {
-      setFileName((current) => current || "Uploaded image");
-    }
 
     try {
       const response = await fetch("/api/analyze", {
@@ -126,6 +163,11 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
       ...current,
       [name]: nextValue,
     }));
+    recordCorrection({
+      originalFoodName: name,
+      updatedFoodName: name,
+      action: "portion_change",
+    });
   }
 
   function rerunAnalysis() {
@@ -143,6 +185,12 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
     saveMeal(entry);
     setSavedMeals(loadSavedMeals());
     setSaveMessage("Saved to local meal history.");
+  }
+
+  function deleteSavedMeal(id: string) {
+    deleteMeal(id);
+    setSavedMeals(loadSavedMeals());
+    setSaveMessage("Saved meal deleted.");
   }
 
   async function copySummary() {
@@ -178,7 +226,38 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
           : food
       ),
     }));
+    recordCorrection({
+      originalFoodName: originalName,
+      updatedFoodName: nextName,
+      action: "replace",
+    });
     setSaveMessage("Food replacement updated locally. Re-run analysis to re-ground it.");
+  }
+
+  function removeFood(name: string) {
+    setAnalysis((current) => ({
+      ...current,
+      foods: current.foods.filter((food) => food.name !== name),
+    }));
+    recordCorrection({
+      originalFoodName: name,
+      updatedFoodName: "",
+      action: "remove",
+    });
+    setSaveMessage(`${name} removed from this meal.`);
+  }
+
+  function addFood() {
+    setAnalysis((current) => ({
+      ...current,
+      foods: [...current.foods, { ...blankFood, name: `Custom food ${current.foods.length + 1}` }],
+    }));
+    recordCorrection({
+      originalFoodName: "",
+      updatedFoodName: `Custom food ${analysis.foods.length + 1}`,
+      action: "add",
+    });
+    setSaveMessage("Added a manual food item.");
   }
 
   return (
@@ -286,6 +365,13 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                   className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Re-run
+                </button>
+                <button
+                  type="button"
+                  onClick={addFood}
+                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Add food
                 </button>
               </div>
             </div>
@@ -441,28 +527,38 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                   ) : null}
 
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <label className="block">
-                      <span className="text-xs uppercase tracking-wide text-slate-500">
-                        Manual replacement
-                      </span>
-                      <select
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
-                        defaultValue=""
-                        onChange={(event) => {
-                          if (event.target.value) {
-                            replaceFoodName(food.name, event.target.value);
-                            event.target.value = "";
-                          }
-                        }}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <label className="block flex-1 min-w-56">
+                        <span className="text-xs uppercase tracking-wide text-slate-500">
+                          Manual replacement
+                        </span>
+                        <select
+                          className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
+                          defaultValue=""
+                          onChange={(event) => {
+                            if (event.target.value) {
+                              replaceFoodName(food.name, event.target.value);
+                              event.target.value = "";
+                            }
+                          }}
+                        >
+                          <option value="">Choose a better match</option>
+                          {manualReplacementOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => removeFood(food.name)}
+                        className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
                       >
-                        <option value="">Choose a better match</option>
-                        {manualReplacementOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        Remove food
+                      </button>
+                    </div>
                   </div>
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
@@ -480,6 +576,7 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                         value={multiplier}
                         onChange={(event) => updateMultiplier(food.name, Number(event.target.value))}
                       >
+                        <option value={0.25}>Quarter</option>
                         <option value={0.5}>Half</option>
                         <option value={0.75}>Three quarters</option>
                         <option value={1}>As detected</option>
@@ -518,15 +615,49 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
               {savedMeals.length ? (
                 savedMeals.map((meal) => (
                   <div key={meal.id} className="rounded-2xl bg-slate-50 p-4">
-                    <p className="font-medium text-slate-900">{meal.imageName}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {new Date(meal.createdAt).toLocaleString()}
-                    </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-slate-900">{meal.imageName}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {new Date(meal.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => deleteSavedMeal(meal.id)}
+                        className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100"
+                      >
+                        Delete
+                      </button>
+                    </div>
                     <p className="mt-2 text-sm text-slate-600">{meal.analysis.summary}</p>
                   </div>
                 ))
               ) : (
                 <p className="text-slate-500">No saved meals yet.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
+              Recent correction events
+            </p>
+            <div className="mt-4 space-y-3 text-sm text-slate-700">
+              {corrections.length ? (
+                corrections.slice(0, 8).map((event) => (
+                  <div key={event.id} className="rounded-2xl bg-slate-50 p-4">
+                    <p className="font-medium text-slate-900">{event.action}</p>
+                    <p className="mt-1 text-slate-600">
+                      {event.originalFoodName || "manual"} → {event.updatedFoodName || "removed"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {new Date(event.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-slate-500">No correction data yet.</p>
               )}
             </div>
           </div>

@@ -9,7 +9,7 @@ Provider selection happens in:
 
 Current supported values:
 - unset or anything else -> mock provider
-- `ANALYSIS_PROVIDER=openai` -> placeholder OpenAI provider path
+- `ANALYSIS_PROVIDER=openai` -> OpenAI provider path
 
 ## Environment
 
@@ -19,13 +19,12 @@ Add the provider selection variable to `.env.local`:
 ANALYSIS_PROVIDER=openai
 ```
 
-When the live provider adapter is wired, this file should also hold the provider API key.
-
-Planned environment shape:
+Use this environment shape:
 
 ```bash
 ANALYSIS_PROVIDER=openai
 OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-4.1-mini
 USDA_API_KEY=your_data_gov_api_key_here
 ```
 
@@ -35,3 +34,4 @@ USDA_API_KEY=your_data_gov_api_key_here
 - map provider output into the server-side schema validation layer
 - treat provider failures as structured API errors
 - keep USDA grounding separate from provider vision output
+- use structured JSON output rather than parsing freeform prose

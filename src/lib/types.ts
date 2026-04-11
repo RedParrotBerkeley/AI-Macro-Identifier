@@ -13,6 +13,7 @@ export type GroundingStatus = {
   matchedDescription?: string;
   matchedDataType?: string;
   matchedFdcId?: number;
+  reason?: string;
 };
 
 export type FoodCandidate = {
