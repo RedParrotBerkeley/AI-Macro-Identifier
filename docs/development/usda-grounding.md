@@ -15,11 +15,13 @@ The repo now includes:
 
 1. start with structured food candidates from the analysis provider
 2. search USDA using the detected food name
-3. rank candidates with simple heuristics:
+3. rank candidates with practical heuristics:
+   - synonym-normalized food names
    - exact/near name match
    - shared words
    - USDA score
    - preference for Foundation, then FNDDS, then Branded
+   - penalty for obviously wrong branded matches when the detected food is generic
 4. fetch the best USDA food record
 5. extract macros from the USDA nutrient payload
 6. scale per-100g macros to the estimated weight from analysis
@@ -30,11 +32,11 @@ The repo now includes:
 This is a useful MVP grounding path, but not the final one.
 
 Known limitations:
-- string matching is still simple
 - mixed dishes may match imperfectly
 - portion weight is still estimated upstream
-- caching is not implemented yet
-- the route does not invoke grounding automatically yet
+- caching is in-memory only, not persistent
+- synonym handling is still small and hand-authored
+- grounding still depends on the quality of upstream food detection
 
 ## Next steps
 

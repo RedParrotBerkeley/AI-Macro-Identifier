@@ -7,6 +7,14 @@ export type MacroEstimate = {
 
 export type ConfidenceLevel = "low" | "medium" | "high";
 
+export type GroundingStatus = {
+  originalName: string;
+  grounded: boolean;
+  matchedDescription?: string;
+  matchedDataType?: string;
+  matchedFdcId?: number;
+};
+
 export type FoodCandidate = {
   name: string;
   confidence: number;

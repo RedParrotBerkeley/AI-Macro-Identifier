@@ -2,12 +2,22 @@
 
 import { useMemo, useState } from "react";
 
-import type { AnalysisResult } from "@/lib/types";
+import type { AnalysisResult, GroundingStatus } from "@/lib/types";
 
 type AnalyzeApiResponse = AnalysisResult & {
   status: "ok";
-  pipelineStage: "mocked-analysis";
+  pipelineStage: string;
   imageProvided: boolean;
+  provider: string;
+  grounding: GroundingStatus[];
+};
+
+type AnalyzeErrorResponse = {
+  status: "error";
+  code: string;
+  message: string;
+  provider?: string;
+  pipelineStage?: string;
 };
 
 export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: AnalysisResult }) {
@@ -18,6 +28,9 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
   const [error, setError] = useState<string>("");
   const [dragActive, setDragActive] = useState(false);
   const [portionMultipliers, setPortionMultipliers] = useState<Record<string, number>>({});
+  const [providerName, setProviderName] = useState<string>("mock-analysis-provider");
+  const [pipelineStage, setPipelineStage] = useState<string>("mocked-analysis");
+  const [grounding, setGrounding] = useState<GroundingStatus[]>([]);
 
   const totals = useMemo(() => {
     return analysis.foods.reduce(
@@ -54,6 +67,10 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
     setIsAnalyzing(true);
     setError("");
 
+    if (previewUrl) {
+      setFileName((current) => current || "Uploaded image");
+    }
+
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
@@ -65,12 +82,19 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Analysis failed with status ${response.status}`);
+      const data = (await response.json()) as AnalyzeApiResponse | AnalyzeErrorResponse;
+
+      if (!response.ok || data.status === "error") {
+        const message = data.status === "error"
+          ? data.message
+          : `Analysis failed with status ${response.status}`;
+        throw new Error(message);
       }
 
-      const data = (await response.json()) as AnalyzeApiResponse;
       setAnalysis(data);
+      setProviderName(data.provider);
+      setPipelineStage(data.pipelineStage);
+      setGrounding(data.grounding);
       setPortionMultipliers({});
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Unknown analysis error");
@@ -168,6 +192,11 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                 <p className="text-sm leading-6 text-slate-600">
                   {fileName ? `Ready to analyze: ${fileName}` : "Choose a meal photo to test the pipeline."}
                 </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {isAnalyzing
+                    ? "Running provider analysis, then attempting USDA grounding."
+                    : "Current flow: provider analysis → schema validation → USDA grounding."}
+                </p>
                 {error ? <p className="mt-1 text-sm text-rose-600">{error}</p> : null}
               </div>
               <button
@@ -200,6 +229,24 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                 </div>
               </div>
               <p className="mt-3 text-sm leading-6 text-slate-600">{analysis.summary}</p>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <p className="font-medium text-slate-900">Debug details</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Provider</p>
+                  <p>{providerName}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Pipeline</p>
+                  <p>{pipelineStage}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Grounded foods</p>
+                  <p>{grounding.filter((item) => item.grounded).length} / {analysis.foods.length}</p>
+                </div>
+              </div>
             </div>
 
             {analysis.followUpQuestions.length ? (
@@ -254,6 +301,15 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                       </span>
                       <span className="rounded-full bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">
                         Portion {food.portionConfidenceLabel}
+                      </span>
+                      <span
+                        className={`rounded-full px-3 py-1 text-sm font-medium ${
+                          food.dataSource === "usda"
+                            ? "bg-violet-50 text-violet-700"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {food.dataSource === "usda" ? "USDA grounded" : "Estimate only"}
                       </span>
                     </div>
                   </div>

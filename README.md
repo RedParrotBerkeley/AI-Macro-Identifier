@@ -4,7 +4,7 @@ AI Macro Identifier is a food-photo nutrition app aimed at giving users a fast, 
 
 ## Current status
 
-This repo is now in active MVP development.
+This repo is in active MVP development on the `feat/mvp-foundation` branch.
 
 Current working capabilities:
 - upload a food photo with instant local preview
@@ -12,14 +12,14 @@ Current working capabilities:
 - render structured food candidates and macro totals
 - expose ambiguity, confidence, and follow-up questions
 - adjust portions and instantly recalculate totals
-- use USDA-oriented helper modules as the nutrient grounding layer foundation
+- validate and normalize provider output server-side
+- ground detected foods toward USDA-backed macro estimates through the new grounding layer
 
 ## Product direction
 
 The useful version of this product is not "take a photo and trust the number blindly."
 
 It is:
-
 - detect likely foods in the image
 - estimate portion size with explicit uncertainty
 - map foods to a nutrient database
@@ -44,6 +44,7 @@ Detailed notes live in:
 - `docs/architecture/overview.md`
 - `docs/development/roadmap.md`
 - `docs/development/usda-grounding.md`
+- `docs/development/next-20-line-items.md`
 
 ## Production vs development structure
 
@@ -52,12 +53,13 @@ Detailed notes live in:
 - `src/app` route handlers and app entrypoints
 - `src/components` UI components
 - `src/lib` domain logic, provider adapters, and integrations
-- `src/lib/analysis` analysis-provider abstraction layer
+- `src/lib/analysis` analysis-provider abstraction, schema validation, normalization, and provider factory
+- `src/lib/grounding.ts` USDA grounding flow for detected foods
 
 ### Development and planning structure
 
 - `docs/architecture` system design notes
-- `docs/development` roadmap and workflow notes
+- `docs/development` roadmap, grounding notes, and execution checklist
 - `docs/research-notes-2026-04-11.md` research grounding for product decisions
 - `scripts/dev-check.sh` local verification helper
 
@@ -76,10 +78,9 @@ Detailed notes live in:
 - schema validation and normalization for provider output
 - current mocked provider behind a stable structured schema
 - placeholder provider adapter for future live multimodal integration
-- USDA search, food-details fetch, and nutrient extraction helpers
-- USDA grounding module for mapping detected foods to public nutrient records
+- USDA search, food-details fetch, nutrient extraction, and grounding helpers
 
-## API contract, current mocked shape
+## API contract, current shape
 
 `POST /api/analyze`
 
@@ -96,6 +97,7 @@ Returns a structured analysis response with:
 - ambiguity notes
 - targeted follow-up questions
 - macro totals derived from per-food macro estimates
+- provider and pipeline-stage metadata in the route response
 
 This richer schema is intentional. The contract is designed to survive real provider integration without forcing a UI rewrite.
 
@@ -107,6 +109,8 @@ Recommended usage direction:
 - prefer Foundation and FNDDS for common foods and mixed dishes
 - use Branded as fallback for packaged food matching
 - cache resolved matches to reduce repeated lookups
+- normalize common food-name variants before USDA search
+- ground model-detected foods against USDA when confidence and matching quality are sufficient
 
 ## Environment
 
@@ -137,6 +141,8 @@ A usable MVP should do all of the following:
 3. Invoke USDA grounding from the analysis pipeline with clear success/failure handling.
 4. Add caching for repeated USDA lookups and resolved food records.
 5. Add persistence for meal history and corrected meals.
+
+For a larger execution list, see `docs/development/next-20-line-items.md`.
 
 ## Run locally
 

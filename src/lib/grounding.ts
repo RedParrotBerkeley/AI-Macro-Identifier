@@ -5,8 +5,15 @@ import { getUsdaFoodDetails, searchUsdaFoods, type UsdaSearchFood } from "@/lib/
 const DATA_TYPE_PRIORITY: Record<string, number> = {
   Foundation: 4,
   "Survey (FNDDS)": 3,
-  Branded: 2,
+  Branded: 1,
 };
+
+const FOOD_SYNONYMS: Array<[RegExp, string]> = [
+  [/\bgrilled chicken breast\b/g, "chicken breast"],
+  [/\bcooked white rice\b/g, "white rice"],
+  [/\bmixed vegetables\b/g, "vegetables"],
+  [/\bplain steamed vegetables\b/g, "vegetables"],
+];
 
 export type GroundingResult = {
   analysis: AnalysisResult;
@@ -21,8 +28,9 @@ export async function groundAnalysisWithUsda(analysis: AnalysisResult): Promise<
   const groundedFoods = await Promise.all(
     analysis.foods.map(async (food) => {
       try {
-        const searchResults = await searchUsdaFoods(food.name);
-        const matchedFood = rankUsdaCandidates(food, searchResults)[0];
+        const normalizedFood = normalizeFoodName(food.name);
+        const searchResults = await searchUsdaFoods(normalizedFood);
+        const matchedFood = rankUsdaCandidates({ ...food, name: normalizedFood }, searchResults)[0];
 
         if (!matchedFood) {
           return {
@@ -83,14 +91,15 @@ export function rankUsdaCandidates(food: FoodCandidate, candidates: UsdaSearchFo
 }
 
 function scoreCandidate(food: FoodCandidate, candidate: UsdaSearchFood) {
-  const foodName = food.name.toLowerCase();
+  const foodName = normalizeFoodName(food.name);
   const description = candidate.description.toLowerCase();
   const exactNameBonus = description.includes(foodName) ? 30 : 0;
   const partialBonus = sharedWordCount(foodName, description) * 5;
   const scoreBonus = candidate.score ?? 0;
   const dataTypeBonus = DATA_TYPE_PRIORITY[candidate.dataType || ""] ?? 0;
+  const brandedPenalty = candidate.dataType === "Branded" && isGenericFood(foodName) ? 8 : 0;
 
-  return exactNameBonus + partialBonus + scoreBonus + dataTypeBonus;
+  return exactNameBonus + partialBonus + scoreBonus + dataTypeBonus - brandedPenalty;
 }
 
 function sharedWordCount(left: string, right: string) {
@@ -114,6 +123,20 @@ function scaleMacrosByWeight(macrosPer100g: FoodCandidate["macros"], weightGrams
     carbsGrams: Math.round(macrosPer100g.carbsGrams * factor * 10) / 10,
     fatGrams: Math.round(macrosPer100g.fatGrams * factor * 10) / 10,
   };
+}
+
+function normalizeFoodName(name: string) {
+  let normalized = name.trim().toLowerCase();
+
+  for (const [pattern, replacement] of FOOD_SYNONYMS) {
+    normalized = normalized.replace(pattern, replacement);
+  }
+
+  return normalized;
+}
+
+function isGenericFood(name: string) {
+  return ["chicken", "chicken breast", "rice", "white rice", "vegetables", "avocado"].includes(name);
 }
 
 function dedupe(values: string[]) {
