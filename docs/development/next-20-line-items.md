@@ -22,14 +22,14 @@ This list is ordered for MVP progress, not novelty.
 
 11. Show grounding success/failure badges in the UI for each detected food.
 12. Surface provider and pipeline-stage details in a developer-friendly debug panel.
-13. Add a user-visible "re-run analysis" flow after portion or photo changes.
-14. Add a lightweight loading state that explains what the system is doing, not just a spinner.
-15. Add optional manual food replacement when USDA grounding chooses the wrong item.
+13. Add a user-visible "re-run analysis" flow after portion or photo changes. ✅
+14. Add a lightweight loading state that explains what the system is doing, not just a spinner. ✅
+15. Add optional manual food replacement when USDA grounding chooses the wrong item. ✅
 
 ## 16-20: cross the MVP threshold
 
-16. Add a save-result action with a simple local persistence layer.
-17. Add meal history view for previously analyzed items.
-18. Add export or copy summary action for calories and macros.
-19. Add environment setup docs for the first real provider, including required API keys.
-20. Add a PR checklist and release-readiness checklist so MVP completion is measurable.
+16. Add a save-result action with a simple local persistence layer. ✅
+17. Add meal history view for previously analyzed items. ✅
+18. Add export or copy summary action for calories and macros. ✅
+19. Add environment setup docs for the first real provider, including required API keys. ✅
+20. Add a PR checklist and release-readiness checklist so MVP completion is measurable. ✅

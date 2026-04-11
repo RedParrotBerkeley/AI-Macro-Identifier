@@ -44,6 +44,8 @@ Detailed notes live in:
 - `docs/architecture/overview.md`
 - `docs/development/roadmap.md`
 - `docs/development/usda-grounding.md`
+- `docs/development/provider-setup.md`
+- `docs/development/release-checklist.md`
 - `docs/development/next-20-line-items.md`
 
 ## Production vs development structure

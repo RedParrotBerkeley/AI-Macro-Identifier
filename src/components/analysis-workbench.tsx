@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { loadSavedMeals, saveMeal, type SavedMeal } from "@/lib/storage";
 import type { AnalysisResult, GroundingStatus } from "@/lib/types";
 
 type AnalyzeApiResponse = AnalysisResult & {
@@ -20,6 +21,16 @@ type AnalyzeErrorResponse = {
   pipelineStage?: string;
 };
 
+const manualReplacementOptions = [
+  "Chicken breast, roasted",
+  "Rice, white, cooked",
+  "Avocados, raw",
+  "Vegetables, mixed, cooked",
+  "Salad greens, mixed",
+  "Salmon, cooked",
+  "Eggs, whole, cooked",
+];
+
 export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: AnalysisResult }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
@@ -31,6 +42,12 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
   const [providerName, setProviderName] = useState<string>("mock-analysis-provider");
   const [pipelineStage, setPipelineStage] = useState<string>("mocked-analysis");
   const [grounding, setGrounding] = useState<GroundingStatus[]>([]);
+  const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
+  const [saveMessage, setSaveMessage] = useState<string>("");
+
+  useEffect(() => {
+    setSavedMeals(loadSavedMeals());
+  }, []);
 
   const totals = useMemo(() => {
     return analysis.foods.reduce(
@@ -85,9 +102,8 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
       const data = (await response.json()) as AnalyzeApiResponse | AnalyzeErrorResponse;
 
       if (!response.ok || data.status === "error") {
-        const message = data.status === "error"
-          ? data.message
-          : `Analysis failed with status ${response.status}`;
+        const message =
+          data.status === "error" ? data.message : `Analysis failed with status ${response.status}`;
         throw new Error(message);
       }
 
@@ -96,6 +112,7 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
       setPipelineStage(data.pipelineStage);
       setGrounding(data.grounding);
       setPortionMultipliers({});
+      setSaveMessage("");
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Unknown analysis error");
     } finally {
@@ -104,10 +121,64 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
   }
 
   function updateMultiplier(name: string, nextValue: number) {
+    setSaveMessage("");
     setPortionMultipliers((current) => ({
       ...current,
       [name]: nextValue,
     }));
+  }
+
+  function rerunAnalysis() {
+    void analyzeCurrentImage();
+  }
+
+  function saveCurrentResult() {
+    const entry: SavedMeal = {
+      id: `${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      imageName: fileName || "Untitled meal",
+      analysis,
+    };
+
+    saveMeal(entry);
+    setSavedMeals(loadSavedMeals());
+    setSaveMessage("Saved to local meal history.");
+  }
+
+  async function copySummary() {
+    const text = [
+      `Meal: ${fileName || "Untitled meal"}`,
+      `Calories: ${totals.calories} kcal`,
+      `Protein: ${totals.proteinGrams} g`,
+      `Carbs: ${totals.carbsGrams} g`,
+      `Fat: ${totals.fatGrams} g`,
+    ].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setSaveMessage("Summary copied to clipboard.");
+    } catch {
+      setSaveMessage("Could not copy summary.");
+    }
+  }
+
+  function replaceFoodName(originalName: string, nextName: string) {
+    setAnalysis((current) => ({
+      ...current,
+      foods: current.foods.map((food) =>
+        food.name === originalName
+          ? {
+              ...food,
+              name: nextName,
+              dataSource: "estimated",
+              ambiguityNotes: Array.from(
+                new Set([...food.ambiguityNotes, `Manually replaced with ${nextName}.`])
+              ),
+            }
+          : food
+      ),
+    }));
+    setSaveMessage("Food replacement updated locally. Re-run analysis to re-ground it.");
   }
 
   return (
@@ -199,14 +270,24 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                 </p>
                 {error ? <p className="mt-1 text-sm text-rose-600">{error}</p> : null}
               </div>
-              <button
-                type="button"
-                onClick={analyzeCurrentImage}
-                disabled={isAnalyzing}
-                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isAnalyzing ? "Analyzing..." : "Analyze photo"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={analyzeCurrentImage}
+                  disabled={isAnalyzing}
+                  className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isAnalyzing ? "Analyzing..." : "Analyze photo"}
+                </button>
+                <button
+                  type="button"
+                  onClick={rerunAnalysis}
+                  disabled={isAnalyzing || !previewUrl}
+                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Re-run
+                </button>
+              </div>
             </div>
           </div>
 
@@ -244,9 +325,29 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-500">Grounded foods</p>
-                  <p>{grounding.filter((item) => item.grounded).length} / {analysis.foods.length}</p>
+                  <p>
+                    {grounding.filter((item) => item.grounded).length} / {analysis.foods.length}
+                  </p>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={saveCurrentResult}
+                className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+              >
+                Save result
+              </button>
+              <button
+                type="button"
+                onClick={() => void copySummary()}
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Copy summary
+              </button>
+              {saveMessage ? <p className="self-center text-sm text-slate-600">{saveMessage}</p> : null}
             </div>
 
             {analysis.followUpQuestions.length ? (
@@ -339,6 +440,31 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                     </div>
                   ) : null}
 
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <label className="block">
+                      <span className="text-xs uppercase tracking-wide text-slate-500">
+                        Manual replacement
+                      </span>
+                      <select
+                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
+                        defaultValue=""
+                        onChange={(event) => {
+                          if (event.target.value) {
+                            replaceFoodName(food.name, event.target.value);
+                            event.target.value = "";
+                          }
+                        }}
+                      >
+                        <option value="">Choose a better match</option>
+                        {manualReplacementOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
                   <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
                     <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                       <MacroChip label="Calories" value={`${Math.round(food.macros.calories * multiplier)} kcal`} />
@@ -386,14 +512,23 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
-              Methodical next integration
+              Saved meal history
             </p>
-            <ol className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
-              <li>1. Expand the response contract with portion confidence and follow-up questions.</li>
-              <li>2. Plug in a real multimodal provider behind the same route.</li>
-              <li>3. Resolve foods to USDA nutrients with caching and ranking.</li>
-              <li>4. Save corrected meals only after the human confirms them.</li>
-            </ol>
+            <div className="mt-4 space-y-3 text-sm text-slate-700">
+              {savedMeals.length ? (
+                savedMeals.map((meal) => (
+                  <div key={meal.id} className="rounded-2xl bg-slate-50 p-4">
+                    <p className="font-medium text-slate-900">{meal.imageName}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {new Date(meal.createdAt).toLocaleString()}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">{meal.analysis.summary}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-slate-500">No saved meals yet.</p>
+              )}
+            </div>
           </div>
         </div>
       </section>
