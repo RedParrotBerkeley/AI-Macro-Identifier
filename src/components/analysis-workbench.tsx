@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  clearCorrections,
   deleteMeal,
   loadCorrections,
   loadSavedMeals,
@@ -112,7 +113,11 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
       createdAt: new Date().toISOString(),
     };
 
-    saveCorrection(fullEvent);
+    saveCorrection({
+      ...fullEvent,
+      mealName: fileName || undefined,
+      summary: analysis.summary,
+    });
     setCorrections(loadCorrections());
   }
 
@@ -232,6 +237,12 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
     setPortionMultipliers({});
     setError("");
     setSaveMessage(`Loaded saved meal: ${meal.imageName}`);
+  }
+
+  function clearCorrectionHistory() {
+    clearCorrections();
+    setCorrections([]);
+    setSaveMessage("Correction history cleared.");
   }
 
   async function copySummary() {
@@ -652,6 +663,18 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
               Saved meal history
             </p>
+            <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-700">
+              <p className="text-slate-500">Recent edits are stored locally to guide future refinement.</p>
+              {corrections.length ? (
+                <button
+                  type="button"
+                  onClick={clearCorrectionHistory}
+                  className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Clear history
+                </button>
+              ) : null}
+            </div>
             <div className="mt-4 space-y-3 text-sm text-slate-700">
               {savedMeals.length ? (
                 savedMeals.map((meal) => (
@@ -693,17 +716,39 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
               Recent correction events
             </p>
+            <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-700">
+              <p className="text-slate-500">Recent edits are stored locally to guide future refinement.</p>
+              {corrections.length ? (
+                <button
+                  type="button"
+                  onClick={clearCorrectionHistory}
+                  className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Clear history
+                </button>
+              ) : null}
+            </div>
             <div className="mt-4 space-y-3 text-sm text-slate-700">
               {corrections.length ? (
                 corrections.slice(0, 8).map((event) => (
                   <div key={event.id} className="rounded-2xl bg-slate-50 p-4">
-                    <p className="font-medium text-slate-900">{event.action}</p>
-                    <p className="mt-1 text-slate-600">
-                      {event.originalFoodName || "manual"} → {event.updatedFoodName || "removed"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {new Date(event.createdAt).toLocaleString()}
-                    </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium capitalize text-slate-900">{event.action.replaceAll("_", " ")}</p>
+                        <p className="mt-1 text-slate-600">
+                          {event.originalFoodName || "manual"} → {event.updatedFoodName || "removed"}
+                        </p>
+                        {event.mealName ? (
+                          <p className="mt-1 text-xs text-slate-500">Meal: {event.mealName}</p>
+                        ) : null}
+                        {event.summary ? (
+                          <p className="mt-1 text-xs text-slate-500">{event.summary}</p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-slate-500">
+                          {new Date(event.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ))
               ) : (

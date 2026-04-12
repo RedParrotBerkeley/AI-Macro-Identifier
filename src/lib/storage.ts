@@ -13,6 +13,8 @@ export type CorrectionEvent = {
   originalFoodName: string;
   updatedFoodName: string;
   action: "replace" | "remove" | "add" | "portion_change";
+  mealName?: string;
+  summary?: string;
 };
 
 const SAVED_MEALS_KEY = "ai-macro-identifier.saved-meals";
@@ -62,4 +64,10 @@ export function saveCorrection(event: CorrectionEvent) {
   const current = loadCorrections();
   const next = [event, ...current].slice(0, 200);
   window.localStorage.setItem(CORRECTIONS_KEY, JSON.stringify(next));
+}
+
+
+export function clearCorrections() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(CORRECTIONS_KEY);
 }
