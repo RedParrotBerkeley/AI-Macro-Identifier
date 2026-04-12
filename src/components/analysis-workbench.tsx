@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  buildCorrectionDefaults,
   clearCorrections,
   deleteMeal,
   loadCorrections,
@@ -90,6 +91,8 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
       }
     };
   }, []);
+
+  const correctionDefaults = useMemo(() => buildCorrectionDefaults(corrections), [corrections]);
 
   const totals = useMemo(() => {
     return analysis.foods.reduce(
@@ -595,6 +598,11 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                           }}
                         >
                           <option value="">Choose a better match</option>
+                          {correctionDefaults.replacements[food.name.toLowerCase()] ? (
+                            <option value={correctionDefaults.replacements[food.name.toLowerCase()]}>
+                              Suggested: {correctionDefaults.replacements[food.name.toLowerCase()]}
+                            </option>
+                          ) : null}
                           {manualReplacementOptions.map((option) => (
                             <option key={option} value={option}>
                               {option}
@@ -603,13 +611,18 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                         </select>
                       </label>
 
-                      <button
-                        type="button"
-                        onClick={() => removeFood(food.name)}
-                        className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
-                      >
-                        Remove food
-                      </button>
+                      <div className="flex flex-col items-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => removeFood(food.name)}
+                          className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+                        >
+                          Remove food
+                        </button>
+                        {correctionDefaults.removedFoods.includes(food.name.toLowerCase()) ? (
+                          <p className="text-xs text-slate-500">You usually remove this item.</p>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
 
@@ -660,20 +673,18 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
-              Saved meal history
-            </p>
-            <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-700">
-              <p className="text-slate-500">Recent edits are stored locally to guide future refinement.</p>
-              {corrections.length ? (
-                <button
-                  type="button"
-                  onClick={clearCorrectionHistory}
-                  className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  Clear history
-                </button>
-              ) : null}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
+                  Saved meal history
+                </p>
+                <p className="mt-2 text-sm text-slate-500">
+                  Reopen previous analyses so history becomes reusable state, not a dead archive.
+                </p>
+              </div>
+              <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                {savedMeals.length} saved
+              </div>
             </div>
             <div className="mt-4 space-y-3 text-sm text-slate-700">
               {savedMeals.length ? (
@@ -713,11 +724,15 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
-              Recent correction events
-            </p>
-            <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-700">
-              <p className="text-slate-500">Recent edits are stored locally to guide future refinement.</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
+                  Recent correction events
+                </p>
+                <p className="mt-2 text-sm text-slate-500">
+                  Local correction history captures what you keep changing, which is the seed of future defaults.
+                </p>
+              </div>
               {corrections.length ? (
                 <button
                   type="button"

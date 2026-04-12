@@ -71,3 +71,29 @@ export function clearCorrections() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(CORRECTIONS_KEY);
 }
+
+
+export type CorrectionDefaults = {
+  replacements: Record<string, string>;
+  removedFoods: string[];
+};
+
+export function buildCorrectionDefaults(events: CorrectionEvent[]): CorrectionDefaults {
+  const replacements: Record<string, string> = {};
+  const removedFoods = new Set<string>();
+
+  for (const event of events) {
+    if (event.action === "replace" && event.originalFoodName && event.updatedFoodName) {
+      replacements[event.originalFoodName.toLowerCase()] = event.updatedFoodName;
+    }
+
+    if (event.action === "remove" && event.originalFoodName) {
+      removedFoods.add(event.originalFoodName.toLowerCase());
+    }
+  }
+
+  return {
+    replacements,
+    removedFoods: Array.from(removedFoods),
+  };
+}
