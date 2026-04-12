@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   deleteMeal,
@@ -61,6 +61,7 @@ const blankFood: FoodCandidate = {
 
 export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: AnalysisResult }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [analysis, setAnalysis] = useState<AnalysisResult>(initialAnalysis);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -77,6 +78,14 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
   useEffect(() => {
     setSavedMeals(loadSavedMeals());
     setCorrections(loadCorrections());
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+    };
   }, []);
 
   const totals = useMemo(() => {
@@ -108,10 +117,13 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
   function applyFile(file: File | null) {
     if (!file || !file.type.startsWith("image/")) return;
     const nextUrl = URL.createObjectURL(file);
-    setPreviewUrl((current) => {
-      if (current) URL.revokeObjectURL(current);
-      return nextUrl;
-    });
+
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+    }
+
+    objectUrlRef.current = nextUrl;
+    setPreviewUrl(nextUrl);
     setFileName(file.name);
     setError("");
   }
@@ -175,6 +187,11 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
   }
 
   function saveCurrentResult() {
+    if (!analysis.foods.length) {
+      setSaveMessage("Run an analysis before saving a result.");
+      return;
+    }
+
     const entry: SavedMeal = {
       id: `${Date.now()}`,
       createdAt: new Date().toISOString(),
