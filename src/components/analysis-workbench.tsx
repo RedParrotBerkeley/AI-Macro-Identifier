@@ -21,6 +21,8 @@ type AnalyzeApiResponse = AnalysisResult & {
   grounding: GroundingStatus[];
 };
 
+type UiPipelineStage = string | "saved-analysis";
+
 type AnalyzeErrorResponse = {
   status: "error";
   code: string;
@@ -69,7 +71,7 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
   const [dragActive, setDragActive] = useState(false);
   const [portionMultipliers, setPortionMultipliers] = useState<Record<string, number>>({});
   const [providerName, setProviderName] = useState<string>("mock-analysis-provider");
-  const [pipelineStage, setPipelineStage] = useState<string>("mocked-analysis");
+  const [pipelineStage, setPipelineStage] = useState<UiPipelineStage>("mocked-analysis");
   const [grounding, setGrounding] = useState<GroundingStatus[]>([]);
   const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
   const [corrections, setCorrections] = useState<CorrectionEvent[]>([]);
@@ -208,6 +210,28 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
     deleteMeal(id);
     setSavedMeals(loadSavedMeals());
     setSaveMessage("Saved meal deleted.");
+  }
+
+  function loadSavedMeal(meal: SavedMeal) {
+    setAnalysis(meal.analysis);
+    setFileName(meal.imageName);
+    setPreviewUrl(null);
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    setGrounding(
+      meal.analysis.foods.map((food) => ({
+        originalName: food.name,
+        grounded: food.dataSource === "usda",
+        matchedDescription: food.dataSource === "usda" ? food.name : undefined,
+      }))
+    );
+    setProviderName("saved-meal-history");
+    setPipelineStage("saved-analysis");
+    setPortionMultipliers({});
+    setError("");
+    setSaveMessage(`Loaded saved meal: ${meal.imageName}`);
   }
 
   async function copySummary() {
@@ -639,13 +663,22 @@ export function AnalysisWorkbench({ initialAnalysis }: { initialAnalysis: Analys
                           {new Date(meal.createdAt).toLocaleString()}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => deleteSavedMeal(meal.id)}
-                        className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => loadSavedMeal(meal)}
+                          className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 transition hover:bg-sky-100"
+                        >
+                          Load
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteSavedMeal(meal.id)}
+                          className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                     <p className="mt-2 text-sm text-slate-600">{meal.analysis.summary}</p>
                   </div>
