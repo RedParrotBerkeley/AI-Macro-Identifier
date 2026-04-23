@@ -160,3 +160,11 @@ Then open `http://localhost:3000`.
 ```bash
 ./scripts/dev-check.sh
 ```
+
+
+## Portfolio snapshot
+
+- **Problem:** Food-photo macro estimation is useful but uncertain, especially around portion size.
+- **Core capability:** Image-based macro estimation with uncertainty handling and user correction loops.
+- **Primary stack:** TypeScript app + vision/API-backed analysis pipeline.
+- **Status:** Active MVP foundation work.
